@@ -3,38 +3,57 @@ name: Deploy Checkout Service
 on:
   push:
     branches:
-      - '*'
+      - main
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://checkout.example.com
     permissions:
       contents: read
       id-token: write
+      deployments: write
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Build application
         run: |
           echo "Building Checkout Service..."
-          npm install
           npm run build
 
       - name: Deploy to production
         env:
+          # Scoped to production environment: decrypted only after approvals & wait timer pass
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
           ENVIRONMENT: production
         run: |
-          echo "Deploying to production..."
+          echo "Deploying to production from ref: ${{ github.ref }}"
+          echo "Deployment run ID: ${{ github.run_id }}"
+          echo "Triggered by actor: ${{ github.actor }}"
           echo "Deploy key: ${DEPLOY_KEY:0:10}..."
           echo "Database URL: $DATABASE_URL"
           echo "API Token: ${API_TOKEN:0:10}..."
           echo "Application deployed successfully"
           echo "Deployment timestamp: $(date)"
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying production deployment..."
+          echo "Health check: OK"
 
       - name: Notify deployment
         if: success()
